@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Трекер роста и идеального веса</title>
+<style>
+  :root{
+    --bg: #f6f8fb;
+    --card: #ffffff;
+    --accent:#2b6ef6;
+    --muted:#6b7280;
+    --danger:#e53e3e;
+    --glass: rgba(43,110,246,0.08);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: linear-gradient(180deg,#eef2ff 0%, var(--bg) 100%);
+    color:#111827;
+    padding:32px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:980px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns: 1fr 360px;
+    gap:20px;
+  }
+
+  header{
+    grid-column:1 / -1;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:8px;
+  }
+  header h1{
+    font-size:20px;
+    margin:0;
+  }
+  .card{
+    background:var(--card);
+    border-radius:12px;
+    padding:18px;
+    box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+  }
+  label{display:block;font-size:13px;color:var(--muted); margin-bottom:6px}
+  .field{margin-bottom:12px}
+  input[type="number"], select{
+    width:100%;
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid #e6e9ef;
+    font-size:15px;
+    outline:none;
+    background:#fff;
+  }
+  .row{display:flex; gap:12px}
+  .row .col{flex:1}
+  button{
+    background:var(--accent);
+    color:white;
+    padding:10px 14px;
+    border-radius:10px;
+    border:0;
+    cursor:pointer;
+    font-weight:600;
+    display:inline-flex;
+    gap:8px;
+    align-items:center;
+  }
+  button.ghost{
+    background:transparent;
+    color:var(--accent);
+    border:1px solid rgba(43,110,246,0.12);
+    font-weight:600;
+  }
+  .results{margin-top:12px; padding:12px; border-radius:10px; background:var(--glass)}
+  .result-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 0}
+  .muted{color:var(--muted); font-size:13px}
+  .big{font-size:20px; font-weight:700}
+  .history-list{max-height:360px; overflow:auto; margin-top:12px; display:flex; flex-direction:column; gap:8px}
+  .hist-item{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px; border-radius:8px; border:1px solid #eef2ff; background:#fff}
+  .small{font-size:13px}
+  .controls{display:flex; gap:8px}
+  .export{background:#111827; color:white; padding:8px 10px; border-radius:8px; font-weight:600}
+  .note{font-size:12px; color:var(--muted); margin-top:8px}
+  footer{grid-column:1/-1; margin-top:10px; font-size:13px; color:var(--muted)}
+  @media (max-width:900px){
+    .wrap{grid-template-columns: 1fr; padding:16px}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Трекер роста — вычисляет идеальный вес</h1>
+      <div class="small muted">Данные остаются только в вашем браузере (localStorage).</div>
+    </header>
+
+    <section class="card" aria-labelledby="formTitle">
+      <h2 id="formTitle" style="margin:0 0 12px 0">Ввести данные</h2>
+
+      <div class="field">
+        <label for="height">Рост (см)</label>
+        <input id="height" type="number" min="50" max="272" inputmode="numeric" placeholder="например, 175" />
+      </div>
+
+      <div class="row">
+        <div class="col field">
+          <label for="gender">Пол</label>
+          <select id="gender" aria-label="Пол">
+            <option value="male">Мужской</option>
+            <option value="female">Женский</option>
+            <option value="other">Другое / предпочитаю не указывать</option>
+          </select>
+        </div>
+
+        <div class="col field">
+          <label for="date">Дата измерения</label>
+          <input id="date" type="date" />
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:6px; align-items:center;">
+        <button id="calcBtn" aria-label="Посчитать">Посчитать</button>
+        <button id="saveBtn" class="ghost" aria-label="Сохранить запись">Сохранить запись</button>
+        <button id="clearBtn" class="ghost" aria-label="Очистить поля">Очистить</button>
+      </div>
+
+      <div class="results" id="results" hidden>
+        <div class="result-row">
+          <div class="muted">Идеальный вес (формула Девина)</div>
+          <div id="devine" class="big">— кг</div>
+        </div>
+        <div class="result-row">
+          <div class="muted">Идеальный вес (целевой BMI = 22)</div>
+          <div id="bmiTarget" class="big">— кг</div>
+        </div>
+        <div style="border-top:1px dashed rgba(0,0,0,0.06); margin-top:8px; padding-top:8px;">
+          <div class="muted">Рекомендуемый вес (BMI 18.5 — 24.9)</div>
+          <div id="bmiRange" class="big">— кг — — кг</div>
+        </div>
+        <div class="note" id="explain"></div>
+      </div>
+    </section>
+
+    <aside class="card" aria-labelledby="historyTitle">
+      <h3 id="historyTitle" style="margin:0 0 8px 0">История</h3>
+
+      <div style="display:flex; gap:8px;">
+        <input id="search" type="text" placeholder="Поиск (дата, рост)" style="flex:1; padding:10px; border-radius:8px; border:1px solid #eef2ff"/>
+        <button id="export" class="export">Экспорт CSV</button>
+      </div>
+
+      <div class="history-list" id="history"></div>
+
+      <div class="note">Можно сохранять несколько записей. Данные хранятся локально в браузере и не отправляются на сервер.</div>
+      <div style="margin-top:10px; display:flex; gap:8px;">
+        <button id="deleteAll" class="ghost" style="color:var(--danger); border-color:rgba(229,62,62,0.12)">Удалить всё</button>
+        <button id="loadSample" class="ghost">Добавить пример</button>
+      </div>
+    </aside>
+
+    <footer>
+      <strong>Как считаем:</strong> формула Девина (Devine): для мужчин — 50 кг + 2.3 кг × (рост в дюймах − 60); для женщин — 45.5 кг + 2.3 × (рост в дюймах − 60). Также показан вес при целевом BMI = 22 и рекомендуемый диапазон BMI 18.5–24.9.
+    </footer>
+  </div>
+
+<script>
+/* Helpers */
+const el = (id) => document.getElementById(id);
+
+function cmToInches(cm){ return cm / 2.54; }
+function round(v, n=1){ return Math.round(v * Math.pow(10,n)) / Math.pow(10,n); }
+
+/* Formula implementations */
+
+/**
+ * Devine formula (metric input cm).
+ * Returns kg, rounded to 1 decimal.
+ */
+function devineKg(heightCm, gender){
+  const inches = cmToInches(heightCm);
+  const baseInches = 60; // 5 feet
+  const diff = inches - baseInches;
+  let base = 50;
+  if(gender === 'female') base = 45.5;
+  // for 'other' we take average of male/female bases
+  if(gender === 'other') base = (50 + 45.5) / 2;
+  const kg = base + 2.3 * Math.max(diff, 0);
+  return round(kg, 1);
+}
+
+/**
+ * BMI-based target weight for BMI = 22
+ */
+function bmiTargetKg(heightCm, bmiTarget=22){
+  const h = heightCm / 100;
+  return round(bmiTarget * h * h, 1);
+}
+
+/**
+ * BMI range 18.5 - 24.9
+ */
+function bmiRangeKg(heightCm){
+  const h = heightCm / 100;
+  const min = round(18.5 * h * h, 1);
+  const max = round(24.9 * h * h, 1);
+  return {min, max};
+}
+
+/* UI and storage */
+const storageKey = 'heightWeightTracker.v1';
+function loadHistory(){
+  try{
+    const raw = localStorage.getItem(storageKey);
+    return raw ? JSON.parse(raw) : [];
+  } catch(e){ return []; }
+}
+function saveHistory(list){
+  localStorage.setItem(storageKey, JSON.stringify(list));
+}
+
+function formatDateInputToLabel(dateStr){
+  if(!dateStr) return new Date().toLocaleDateString();
+  const d = new Date(dateStr + 'T00:00:00');
+  if(isNaN(d)) return dateStr;
+  return d.toLocaleDateString();
+}
+
+function renderHistory(filter=''){
+  const history = loadHistory().slice().reverse(); // show newest first
+  const container = el('history');
+  container.innerHTML = '';
+  const q = filter.trim().toLowerCase();
+  history.forEach((rec, idx) => {
+    const label = `${formatDateInputToLabel(rec.date)} — ${rec.height} см — ${rec.gender === 'male' ? 'муж' : rec.gender === 'female' ? 'жен' : 'другое'}`;
+    if(q && !label.toLowerCase().includes(q) && !(rec.height + '').includes(q)) return;
+    const div = document.createElement('div');
+    div.className = 'hist-item';
+    div.innerHTML = `
+      <div>
+        <div style="font-weight:700">${rec.height} см • ${rec.gender === 'male' ? 'Мужской' : rec.gender === 'female' ? 'Женский' : 'Другое'}</div>
+        <div class="small muted">${formatDateInputToLabel(rec.date)} • Devine ${rec.devine} кг • BMI22 ${rec.bmiTarget} кг</div>
+      </div>
+      <div class="controls">
+        <button data-action="load" title="Загрузить запись">Загрузить</button>
+        <button data-action="delete" title="Удалить" class="ghost" style="background:transparent;border:1px solid rgba(0,0,0,0.06)">✕</button>
+      </div>
+    `;
+    container.appendChild(div);
+
+    div.querySelector('button[data-action="load"]').addEventListener('click', ()=> {
+      el('height').value = rec.height;
+      el('gender').value = rec.gender;
+      el('date').value = rec.date || '';
+      calculateAndShow();
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
+    div.querySelector('button[data-action="delete"]').addEventListener('click', ()=> {
+      if(!confirm('Удалить запись?')) return;
+      const all = loadHistory();
+      // find matching: small tolerance; remove one item that matches height/date/gender/devine to be safe
+      const idxToRemove = all.findIndex(r =>
+        r.height === rec.height && r.date === rec.date && r.gender === rec.gender && r.devine === rec.devine && r.bmiTarget === rec.bmiTarget
+      );
+      if(idxToRemove >= 0){
+        all.splice(idxToRemove,1);
+        saveHistory(all);
+        renderHistory(el('search').value);
+      }
+    });
+  });
+
+  if(container.children.length === 0){
+    container.innerHTML = `<div class="muted small" style="padding:8px">Пусто — сохранённые записи появятся здесь.</div>`;
+  }
+}
+
+/* Calculation + display */
+function calculateAndShow(){
+  const h = parseFloat(el('height').value);
+  const gender = el('gender').value;
+  if(!h || isNaN(h) || h < 50 || h > 272){
+    el('results').hidden = true;
+    return;
+  }
+  const dev = devineKg(h, gender);
+  const bmiT = bmiTargetKg(h, 22);
+  const range = bmiRangeKg(h);
+
+  el('devine').textContent = `${dev} кг`;
+  el('bmiTarget').textContent = `${bmiT} кг`;
+  el('bmiRange').textContent = `${range.min} кг — ${range.max} кг`;
+  el('explain').innerHTML = `Формула Девина даёт ориентир; BMI22 — вес при BMI = 22. Рекомендуемый диапазон указан по BMI 18.5–24.9.`;
+  el('results').hidden = false;
+
+  return {devine: dev, bmiTarget: bmiT, bmiRange: range};
+}
+
+/* Buttons */
+el('calcBtn').addEventListener('click', ()=> calculateAndShow());
+
+el('clearBtn').addEventListener('click', ()=>{
+  el('height').value = '';
+  el('gender').value = 'male';
+  el('date').value = '';
+  el('results').hidden = true;
+});
+
+el('saveBtn').addEventListener('click', ()=>{
+  const h = parseFloat(el('height').value);
+  const gender = el('gender').value;
+  const date = el('date').value || new Date().toISOString().slice(0,10);
+  if(!h || isNaN(h) || h < 50 || h > 272){
+    alert('Пожалуйста, введите корректный рост в сантиметрах (например, 175).');
+    return;
+  }
+  const calc = calculateAndShow();
+  if(!calc) return;
+
+  const all = loadHistory();
+  all.push({
+    id: Date.now(),
+    height: h,
+    gender: gender,
+    date: date,
+    devine: calc.devine,
+    bmiTarget: calc.bmiTarget,
+    bmiRange: calc.bmiRange
+  });
+  saveHistory(all);
+  renderHistory(el('search').value);
+});
+
+el('deleteAll').addEventListener('click', ()=>{
+  if(!confirm('Удалить все записи? Это действие нельзя отменить.')) return;
+  localStorage.removeItem(storageKey);
+  renderHistory();
+});
+
+el('search').addEventListener('input', (e)=> renderHistory(e.target.value));
+
+el('export').addEventListener('click', ()=>{
+  const data = loadHistory();
+  if(!data.length){ alert('Нет записей для экспорта.'); return; }
+  const header = ['date','height_cm','gender','devine_kg','bmi22_kg','bmi_min_kg','bmi_max_kg'];
+  const rows = data.map(r => {
+    return [
+      r.date || '',
+      r.height,
+      r.gender,
+      r.devine,
+      r.bmiTarget,
+      r.bmiRange.min,
+      r.bmiRange.max
+    ].join(',');
+  });
+  const csv = [header.join(','), ...rows].join('\\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'height_weight_history.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+/* sample quick data */
+el('loadSample').addEventListener('click', ()=>{
+  const sample = [
+    {height: 175, gender:'male', date: new Date().toISOString().slice(0,10)},
+    {height: 162, gender:'female', date: new Date(Date.now() - 86400000*3).toISOString().slice(0,10)},
+    {height: 182, gender:'male', date: new Date(Date.now() - 86400000*10).toISOString().slice(0,10)}
+  ];
+  const curr = loadHistory();
+  sample.forEach(s => {
+    const calc = {devine: devineKg(s.height,s.gender), bmiTarget: bmiTargetKg(s.height,22), bmiRange: bmiRangeKg(s.height)};
+    curr.push({...s, devine: calc.devine, bmiTarget: calc.bmiTarget, bmiRange: calc.bmiRange});
+  });
+  saveHistory(curr);
+  renderHistory();
+});
+
+/* init */
+document.addEventListener('DOMContentLoaded', ()=>{
+  // set date default to today
+  const d = new Date().toISOString().slice(0,10);
+  el('date').value = d;
+  renderHistory();
+  // calculate live on height change
+  el('height').addEventListener('input', ()=> calculateAndShow());
+  el('gender').addEventListener('change', ()=> calculateAndShow());
+});
+</script>
+</body>
+</html>
